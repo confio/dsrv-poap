@@ -1,11 +1,13 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
-use cosmwasm_std::{to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult};
+use cosmwasm_std::{
+    to_binary, Binary, Deps, DepsMut, Env, Event, MessageInfo, Response, StdError, StdResult,
+};
 use cw2::set_contract_version;
 
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, GetCountResponse, InstantiateMsg, QueryMsg};
-use crate::state::{State, STATE};
+use crate::state::{BadgeData, EventData, State, ATTENDEES, BADGES, EVENTS, STATE};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:dsrv-poap";
@@ -15,53 +17,145 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub fn instantiate(
     deps: DepsMut,
     _env: Env,
-    info: MessageInfo,
-    msg: InstantiateMsg,
+    _info: MessageInfo,
+    _msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
-    let state = State {
-        count: msg.count,
-        owner: info.sender.clone(),
-    };
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-    STATE.save(deps.storage, &state)?;
-
-    Ok(Response::new()
-        .add_attribute("method", "instantiate")
-        .add_attribute("owner", info.sender)
-        .add_attribute("count", msg.count.to_string()))
+    Ok(Response::new())
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn execute(
     deps: DepsMut,
-    _env: Env,
+    env: Env,
     info: MessageInfo,
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
-        ExecuteMsg::Increment {} => try_increment(deps),
-        ExecuteMsg::Reset { count } => try_reset(deps, info, count),
+        ExecuteMsg::RegisterEvent {
+            name,
+            image,
+            description,
+            start_time,
+            end_time,
+        } => execute_register_event(
+            deps,
+            env,
+            info,
+            name,
+            image,
+            description,
+            start_time,
+            end_time,
+        ),
+        ExecuteMsg::MintBadge {
+            event,
+            attendee,
+            was_late,
+        } => execute_mint_badge(deps, env, info, event, attendee, was_late),
     }
 }
 
-pub fn try_increment(deps: DepsMut) -> Result<Response, ContractError> {
-    STATE.update(deps.storage, |mut state| -> Result<_, ContractError> {
-        state.count += 1;
-        Ok(state)
-    })?;
+pub fn execute_register_event(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    name: String,
+    image: String,
+    description: String,
+    start_time: u64,
+    end_time: u64,
+) -> Result<Response, ContractError> {
+    if EVENTS.may_load(deps.storage, &name)?.is_some() {
+        return Err(ContractError::EventAlreadyRegistered);
+    }
+    let event = build_event(
+        &env,
+        &info,
+        name.clone(),
+        image,
+        description,
+        start_time,
+        end_time,
+    )?;
+    EVENTS.save(deps.storage, &name, &event)?;
 
-    Ok(Response::new().add_attribute("method", "try_increment"))
+    Ok(Response::new().add_attribute("register_event", name))
 }
 
-pub fn try_reset(deps: DepsMut, info: MessageInfo, count: i32) -> Result<Response, ContractError> {
-    STATE.update(deps.storage, |mut state| -> Result<_, ContractError> {
-        if info.sender != state.owner {
-            return Err(ContractError::Unauthorized {});
-        }
-        state.count = count;
-        Ok(state)
-    })?;
-    Ok(Response::new().add_attribute("method", "reset"))
+// validate
+fn build_event(
+    env: &Env,
+    info: &MessageInfo,
+    name: String,
+    image: String,
+    description: String,
+    start_time: u64,
+    end_time: u64,
+) -> Result<EventData, ContractError> {
+    if name.len() < 2 {
+        return Err(ContractError::NameTooShort);
+    }
+    if name.len() > 100 {
+        return Err(ContractError::NameTooLong);
+    }
+    if !image.startswith("https://") {
+        return Err(ContractError::InvalidImageURL(image));
+    }
+    if start_time >= end_time {
+        return Err(ContractError::StartBeforeEnd);
+    }
+    if end_time < env.block.time.seconds() {
+        return Err(ContractError::EventAlreadyOver);
+        // return Err(StdError::generic_err("event already over").into());
+    }
+
+    let event = EventData {
+        owner: info.sender.clone(),
+        name,
+        image,
+        description,
+        start_time,
+        end_time,
+    };
+    Ok(event)
+}
+
+pub fn execute_mint_badge(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    event: String,
+    attendee: String,
+    was_late: bool,
+) -> Result<Response, ContractError> {
+    let data = EVENTS.load(deps.storage, &event)?;
+    if info.sender != data.owner {
+        return Err(ContractError::Unauthorized {});
+    }
+    if env.block.time.seconds() < data.start_time {
+        return Err(ContractError::EventNotStarted);
+    }
+    if env.block.time.seconds() > data.end_time {
+        return Err(ContractError::EventAlreadyOver);
+    }
+
+    let attendee = deps.api.addr_validate(&attendee)?;
+    if ATTENDEES
+        .may_load(deps.storage, (&event, &attendee))?
+        .is_some()
+    {
+        return Err(ContractError::BadgeAlreadyIssued);
+    }
+
+    let badge = BadgeData { was_late };
+    ATTENDEES.save(deps.storage, (&event, &attendee), &badge)?;
+    BADGES.save(deps.storage, (&attendee, &event), &badge)?;
+
+    let ev = Event::new("mint-badge")
+        .add_attribute("event", event)
+        .add_attribute("attendee", attendee);
+    Ok(Response::new().add_event(ev))
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]

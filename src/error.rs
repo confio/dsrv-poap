@@ -9,8 +9,23 @@ pub enum ContractError {
     #[error("Unauthorized")]
     Unauthorized {},
 
-    #[error("Custom Error val: {val:?}")]
-    CustomError { val: String },
-    // Add any other custom errors you like here.
-    // Look at https://docs.rs/thiserror/1.0.21/thiserror/ for details.
+    #[error("Event name was already registered")]
+    EventAlreadyRegistered,
+
+    #[error("Event name less than 2 characters")]
+    NameTooShort,
+
+    #[error("Event name more than 100 characters")]
+    NameTooLong,
+
+    #[error("Image URL must be https://, was {0}")]
+    InvalidImageURL(String),
+
+    // #[error("Image URL must be https://, was {url}")]
+    // InvalidImageURL{url: String},
+    #[error("Event start time before end time")]
+    StartBeforeEnd,
+
+    #[error("Cannot register an event in the past")]
+    EventAlreadyOver,
 }
