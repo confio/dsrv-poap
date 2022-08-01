@@ -13,6 +13,6 @@ This is a simple "proof of attendence protocol" demo.
 * Given an event
   * See all attendees
   * Show logo and description of event
-* Given a user
+* Given an attendee
   * Show all badges they have
   * Show logo and name for each badge
