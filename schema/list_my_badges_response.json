@@ -1,0 +1,33 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ListMyBadgesResponse",
+  "type": "object",
+  "required": [
+    "badges"
+  ],
+  "properties": {
+    "badges": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/Badge"
+      }
+    }
+  },
+  "definitions": {
+    "Badge": {
+      "type": "object",
+      "required": [
+        "event",
+        "was_late"
+      ],
+      "properties": {
+        "event": {
+          "type": "string"
+        },
+        "was_late": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

@@ -1,15 +1,43 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "ExecuteMsg",
-  "anyOf": [
+  "oneOf": [
     {
       "type": "object",
       "required": [
-        "increment"
+        "register_event"
       ],
       "properties": {
-        "increment": {
-          "type": "object"
+        "register_event": {
+          "type": "object",
+          "required": [
+            "description",
+            "end_time",
+            "image",
+            "name",
+            "start_time"
+          ],
+          "properties": {
+            "description": {
+              "type": "string"
+            },
+            "end_time": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            },
+            "image": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "start_time": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            }
+          }
         }
       },
       "additionalProperties": false
@@ -17,18 +45,25 @@
     {
       "type": "object",
       "required": [
-        "reset"
+        "mint_badge"
       ],
       "properties": {
-        "reset": {
+        "mint_badge": {
           "type": "object",
           "required": [
-            "count"
+            "attendee",
+            "event",
+            "was_late"
           ],
           "properties": {
-            "count": {
-              "type": "integer",
-              "format": "int32"
+            "attendee": {
+              "type": "string"
+            },
+            "event": {
+              "type": "string"
+            },
+            "was_late": {
+              "type": "boolean"
             }
           }
         }

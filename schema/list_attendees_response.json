@@ -1,0 +1,33 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ListAttendeesResponse",
+  "type": "object",
+  "required": [
+    "attendees"
+  ],
+  "properties": {
+    "attendees": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/Attendee"
+      }
+    }
+  },
+  "definitions": {
+    "Attendee": {
+      "type": "object",
+      "required": [
+        "attendee",
+        "was_late"
+      ],
+      "properties": {
+        "attendee": {
+          "type": "string"
+        },
+        "was_late": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

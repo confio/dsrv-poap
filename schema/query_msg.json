@@ -1,15 +1,75 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "QueryMsg",
-  "anyOf": [
+  "oneOf": [
     {
       "type": "object",
       "required": [
-        "get_count"
+        "get_event"
       ],
       "properties": {
-        "get_count": {
+        "get_event": {
+          "type": "object",
+          "required": [
+            "name"
+          ],
+          "properties": {
+            "name": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "list_all_events"
+      ],
+      "properties": {
+        "list_all_events": {
           "type": "object"
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "list_attendees"
+      ],
+      "properties": {
+        "list_attendees": {
+          "type": "object",
+          "required": [
+            "name"
+          ],
+          "properties": {
+            "name": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "list_my_badges"
+      ],
+      "properties": {
+        "list_my_badges": {
+          "type": "object",
+          "required": [
+            "attendee"
+          ],
+          "properties": {
+            "attendee": {
+              "type": "string"
+            }
+          }
         }
       },
       "additionalProperties": false

@@ -177,28 +177,47 @@ fn query_get_event(deps: Deps, name: String) -> StdResult<GetEventResponse> {
 }
 
 fn list_all_events(deps: Deps) -> StdResult<ListAllEventsResponse> {
-    let events = EVENTS
-        .range(deps.storage, None, None, Order::Ascending)
-        .map(|item| {
-            let (_name, data) = item?;
-            Ok(data.into())
-        })
-        .collect::<StdResult<_>>()?;
+    // let events = EVENTS
+    //     .range(deps.storage, None, None, Order::Ascending)
+    //     .limit(30)
+    //     .map(|item| {
+    //         let (_name, data) = item?;
+    //         Ok(data.into())
+    //     })
+    //     .collect::<StdResult<Vec<_>>>()?;
+
+    let mut events = vec![];
+    for evt in EVENTS.range(deps.storage, None, None, Order::Ascending) {
+        let (_name, data) = evt?;
+        events.push(data.into());
+    }
     Ok(ListAllEventsResponse { events })
 }
 
 fn list_attendees(deps: Deps, name: String) -> StdResult<ListAttendeesResponse> {
-    let attendees = ATTENDEES
+    // let attendees = ATTENDEES
+    //     .prefix(&name)
+    //     .range(deps.storage, None, None, Order::Ascending)
+    //     .map(|item| {
+    //         let (attendee, badge) = item?;
+    //         Ok(Attendee {
+    //             attendee: attendee.into(),
+    //             was_late: badge.was_late,
+    //         })
+    //     })
+    //     .collect::<StdResult<_>>()?;
+
+    let mut attendees = vec![];
+    for item in ATTENDEES
         .prefix(&name)
         .range(deps.storage, None, None, Order::Ascending)
-        .map(|item| {
-            let (attendee, badge) = item?;
-            Ok(Attendee {
-                attendee: attendee.into(),
-                was_late: badge.was_late,
-            })
+    {
+        let (attendee, badge) = item?;
+        attendees.push(Attendee {
+            attendee: attendee.into(),
+            was_late: badge.was_late,
         })
-        .collect::<StdResult<_>>()?;
+    }
     Ok(ListAttendeesResponse { attendees })
 }
 
@@ -222,69 +241,87 @@ fn list_my_badges(deps: Deps, attendee: String) -> StdResult<ListMyBadgesRespons
 mod tests {
     use super::*;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coins, from_binary};
 
     #[test]
-    fn proper_initialization() {
+    fn simple_test() {
         let mut deps = mock_dependencies();
 
-        let msg = InstantiateMsg { count: 17 };
-        let info = mock_info("creator", &coins(1000, "earth"));
+        let msg = InstantiateMsg {};
+        let info = mock_info("creator", &[]);
+        instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
 
-        // we can just call .unwrap() to assert this was a success
-        let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
-        assert_eq!(0, res.messages.len());
+        // create an event
+        let start_time = mock_env().block.time.seconds() - 200;
+        let end_time = mock_env().block.time.seconds() + 3000;
+        let info = mock_info("ethan", &[]);
+        let err = execute_register_event(
+            deps.as_mut(),
+            mock_env(),
+            info,
+            "DSRV Hacker House".to_string(),
+            "http://foo.bar".to_string(),
+            "Fun times hacking".to_string(),
+            start_time,
+            end_time,
+        )
+        .unwrap_err();
+        assert_eq!(
+            err,
+            ContractError::InvalidImageURL("http://foo.bar".to_string())
+        );
 
-        // it worked, let's query the state
-        let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
-        let value: GetCountResponse = from_binary(&res).unwrap();
-        assert_eq!(17, value.count);
-    }
+        let name = "DSRV Hacker House";
+        let info = mock_info("ethan", &[]);
+        execute_register_event(
+            deps.as_mut(),
+            mock_env(),
+            info.clone(),
+            name.to_string(),
+            "https://dsrv.kr/logo.png".to_string(),
+            "Fun times hacking".to_string(),
+            start_time,
+            end_time,
+        )
+        .unwrap();
 
-    #[test]
-    fn increment() {
-        let mut deps = mock_dependencies();
+        let attendee = "moog";
+        execute_mint_badge(
+            deps.as_mut(),
+            mock_env(),
+            info.clone(),
+            name.to_string(),
+            attendee.to_string(),
+            false,
+        )
+        .unwrap();
 
-        let msg = InstantiateMsg { count: 17 };
-        let info = mock_info("creator", &coins(2, "token"));
-        let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
+        let late = "bart";
+        execute_mint_badge(
+            deps.as_mut(),
+            mock_env(),
+            info,
+            name.to_string(),
+            late.to_string(),
+            true,
+        )
+        .unwrap();
 
-        // beneficiary can release it
-        let info = mock_info("anyone", &coins(2, "token"));
-        let msg = ExecuteMsg::Increment {};
-        let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
-
-        // should increase counter by 1
-        let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
-        let value: GetCountResponse = from_binary(&res).unwrap();
-        assert_eq!(18, value.count);
-    }
-
-    #[test]
-    fn reset() {
-        let mut deps = mock_dependencies();
-
-        let msg = InstantiateMsg { count: 17 };
-        let info = mock_info("creator", &coins(2, "token"));
-        let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
-
-        // beneficiary can release it
-        let unauth_info = mock_info("anyone", &coins(2, "token"));
-        let msg = ExecuteMsg::Reset { count: 5 };
-        let res = execute(deps.as_mut(), mock_env(), unauth_info, msg);
-        match res {
-            Err(ContractError::Unauthorized {}) => {}
-            _ => panic!("Must return unauthorized error"),
-        }
-
-        // only the original creator can reset the counter
-        let auth_info = mock_info("creator", &coins(2, "token"));
-        let msg = ExecuteMsg::Reset { count: 5 };
-        let _res = execute(deps.as_mut(), mock_env(), auth_info, msg).unwrap();
-
-        // should now be 5
-        let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
-        let value: GetCountResponse = from_binary(&res).unwrap();
-        assert_eq!(5, value.count);
+        // find all attendees
+        let res = list_attendees(deps.as_ref(), name.to_string()).unwrap();
+        assert_eq!(res.attendees.len(), 2);
+        assert_eq!(
+            res.attendees[0],
+            Attendee {
+                attendee: late.to_string(),
+                was_late: true
+            }
+        );
+        assert_eq!(
+            res.attendees[1],
+            Attendee {
+                attendee: attendee.to_string(),
+                was_late: false
+            }
+        );
     }
 }

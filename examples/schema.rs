@@ -3,8 +3,10 @@ use std::fs::create_dir_all;
 
 use cosmwasm_schema::{export_schema, remove_schemas, schema_for};
 
-use dsrv_poap::msg::{ExecuteMsg, GetCountResponse, InstantiateMsg, QueryMsg};
-use dsrv_poap::state::State;
+use dsrv_poap::msg::{
+    ExecuteMsg, GetEventResponse, InstantiateMsg, ListAllEventsResponse, ListAttendeesResponse,
+    ListMyBadgesResponse, QueryMsg,
+};
 
 fn main() {
     let mut out_dir = current_dir().unwrap();
@@ -15,6 +17,8 @@ fn main() {
     export_schema(&schema_for!(InstantiateMsg), &out_dir);
     export_schema(&schema_for!(ExecuteMsg), &out_dir);
     export_schema(&schema_for!(QueryMsg), &out_dir);
-    export_schema(&schema_for!(State), &out_dir);
-    export_schema(&schema_for!(GetCountResponse), &out_dir);
+    export_schema(&schema_for!(GetEventResponse), &out_dir);
+    export_schema(&schema_for!(ListMyBadgesResponse), &out_dir);
+    export_schema(&schema_for!(ListAllEventsResponse), &out_dir);
+    export_schema(&schema_for!(ListAttendeesResponse), &out_dir);
 }
