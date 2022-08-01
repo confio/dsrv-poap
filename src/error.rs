@@ -26,6 +26,12 @@ pub enum ContractError {
     #[error("Event start time before end time")]
     StartBeforeEnd,
 
-    #[error("Cannot register an event in the past")]
+    #[error("The event is already over")]
     EventAlreadyOver,
+
+    #[error("The event hasn't started yet")]
+    EventNotStarted,
+
+    #[error("The attendee already has a badge for this event")]
+    BadgeAlreadyIssued,
 }

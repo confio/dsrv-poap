@@ -1,13 +1,16 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    to_binary, Binary, Deps, DepsMut, Env, Event, MessageInfo, Response, StdError, StdResult,
+    to_binary, Binary, Deps, DepsMut, Env, Event, MessageInfo, Order, Response, StdResult,
 };
 use cw2::set_contract_version;
 
 use crate::error::ContractError;
-use crate::msg::{ExecuteMsg, GetCountResponse, InstantiateMsg, QueryMsg};
-use crate::state::{BadgeData, EventData, State, ATTENDEES, BADGES, EVENTS, STATE};
+use crate::msg::{
+    Attendee, Badge, ExecuteMsg, GetEventResponse, InstantiateMsg, ListAllEventsResponse,
+    ListAttendeesResponse, ListMyBadgesResponse, QueryMsg,
+};
+use crate::state::{BadgeData, EventData, ATTENDEES, BADGES, EVENTS};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:dsrv-poap";
@@ -99,7 +102,7 @@ fn build_event(
     if name.len() > 100 {
         return Err(ContractError::NameTooLong);
     }
-    if !image.startswith("https://") {
+    if !image.starts_with("https://") {
         return Err(ContractError::InvalidImageURL(image));
     }
     if start_time >= end_time {
@@ -161,13 +164,58 @@ pub fn execute_mint_badge(
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::GetCount {} => to_binary(&query_count(deps)?),
+        QueryMsg::GetEvent { name } => to_binary(&query_get_event(deps, name)?),
+        QueryMsg::ListAllEvents {} => to_binary(&list_all_events(deps)?),
+        QueryMsg::ListAttendees { name } => to_binary(&list_attendees(deps, name)?),
+        QueryMsg::ListMyBadges { attendee } => to_binary(&list_my_badges(deps, attendee)?),
     }
 }
 
-fn query_count(deps: Deps) -> StdResult<GetCountResponse> {
-    let state = STATE.load(deps.storage)?;
-    Ok(GetCountResponse { count: state.count })
+fn query_get_event(deps: Deps, name: String) -> StdResult<GetEventResponse> {
+    let evt = EVENTS.load(deps.storage, &name)?;
+    Ok(evt.into())
+}
+
+fn list_all_events(deps: Deps) -> StdResult<ListAllEventsResponse> {
+    let events = EVENTS
+        .range(deps.storage, None, None, Order::Ascending)
+        .map(|item| {
+            let (_name, data) = item?;
+            Ok(data.into())
+        })
+        .collect::<StdResult<_>>()?;
+    Ok(ListAllEventsResponse { events })
+}
+
+fn list_attendees(deps: Deps, name: String) -> StdResult<ListAttendeesResponse> {
+    let attendees = ATTENDEES
+        .prefix(&name)
+        .range(deps.storage, None, None, Order::Ascending)
+        .map(|item| {
+            let (attendee, badge) = item?;
+            Ok(Attendee {
+                attendee: attendee.into(),
+                was_late: badge.was_late,
+            })
+        })
+        .collect::<StdResult<_>>()?;
+    Ok(ListAttendeesResponse { attendees })
+}
+
+fn list_my_badges(deps: Deps, attendee: String) -> StdResult<ListMyBadgesResponse> {
+    let attendee = deps.api.addr_validate(&attendee)?;
+    let badges = BADGES
+        .prefix(&attendee)
+        .range(deps.storage, None, None, Order::Ascending)
+        .map(|item| {
+            let (event, badge) = item?;
+            Ok(Badge {
+                event,
+                was_late: badge.was_late,
+            })
+        })
+        .collect::<StdResult<_>>()?;
+    Ok(ListMyBadgesResponse { badges })
 }
 
 #[cfg(test)]

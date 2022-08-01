@@ -1,3 +1,4 @@
+use crate::state::EventData;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -41,6 +42,19 @@ pub struct GetEventResponse {
     pub description: String,
     pub start_time: u64,
     pub end_time: u64,
+}
+
+impl From<EventData> for GetEventResponse {
+    fn from(evt: EventData) -> Self {
+        GetEventResponse {
+            owner: evt.owner.to_string(),
+            name: evt.name,
+            image: evt.image,
+            description: evt.description,
+            start_time: evt.start_time,
+            end_time: evt.end_time,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

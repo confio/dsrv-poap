@@ -22,5 +22,5 @@ pub struct EventData {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct BadgeData {
-    was_late: bool,
+    pub was_late: bool,
 }
